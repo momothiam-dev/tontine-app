@@ -1,6 +1,7 @@
 // app/api/cron/rappels/route.js
 import { createClient } from '@supabase/supabase-js'
-import { sendEmail, emailTemplates } from '@/lib/email'
+import { sendEmail } from '@/lib/email'
+import { emailTemplates } from '@/lib/email-templates'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
