@@ -1,12 +1,15 @@
-// app/api/cron/rappels/route.js
 import { createClient } from '@supabase/supabase-js'
 import { sendEmail } from '@/lib/email'
-import { emailTemplates } from '@/lib/email-templates'
+import emailTemplates from '@/lib/email-templates'
 
 // Désactiver la pré-génération statique pour cette route API
 export const dynamic = 'force-dynamic'
 
 function getSupabaseClient() {
+  // Sécurité : Vérifier la présence des variables avant d'instancier
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error("Variables Supabase manquantes");
+  }
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -15,15 +18,15 @@ function getSupabaseClient() {
 
 export async function GET(request) {
   try {
-    // Créer le client Supabase uniquement lors de l'exécution
-    const supabase = getSupabaseClient()
-    
-    // Vérifier le token de sécurité
+    // 1. Vérifier le token de sécurité immédiatement
     const authHeader = request.headers.get('authorization')
     if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // 2. Créer le client Supabase
+    const supabase = getSupabaseClient()
+    
     const today = new Date()
     const dans3jours = new Date(today)
     dans3jours.setDate(today.getDate() + 3)
@@ -50,7 +53,6 @@ export async function GET(request) {
 
     // Pour chaque tour, envoyer les rappels
     for (const tour of tours || []) {
-      // Récupérer les membres de cette tontine
       const { data: membres } = await supabase
         .from('membres_tontine')
         .select(`
@@ -62,7 +64,6 @@ export async function GET(request) {
         `)
         .eq('tontine_id', tour.tontine_id)
 
-      // Récupérer les paiements validés pour ce tour
       const { data: paiements } = await supabase
         .from('paiements')
         .select('user_id')
@@ -72,12 +73,18 @@ export async function GET(request) {
       const usersPaids = paiements?.map(p => p.user_id) || []
       const membresNonPayes = membres?.filter(m => !usersPaids.includes(m.user_id)) || []
 
-      // Envoyer email à chaque membre non payé
       for (const membre of membresNonPayes) {
         if (!membre.profile?.email) continue
 
         const joursRestants = Math.ceil((new Date(tour.date_limite) - today) / (1000 * 60 * 60 * 24))
         
+        // --- SÉCURITÉ ANTI-CRASH BUILD ---
+        // On vérifie que le template existe avant de l'appeler
+        if (typeof emailTemplates?.rappelPaiement !== 'function') {
+           console.error("Template 'rappelPaiement' introuvable.");
+           continue; 
+        }
+
         const template = emailTemplates.rappelPaiement(
           tour.tontines.nom,
           tour.tontines.montant,
@@ -85,12 +92,14 @@ export async function GET(request) {
           joursRestants
         )
 
-        await sendEmail({
-          to: membre.profile.email,
-          ...template
-        })
-
-        emailsSent++
+        // Vérification de la fonction d'envoi
+        if (typeof sendEmail === 'function') {
+          await sendEmail({
+            to: membre.profile.email,
+            ...template
+          })
+          emailsSent++
+        }
       }
     }
 
@@ -103,20 +112,3 @@ export async function GET(request) {
     return Response.json({ error: error.message }, { status: 500 })
   }
 }
-```
-
----
-
-## 🔑 AJOUTER LA VARIABLE D'ENVIRONNEMENT
-
-Il te manque une variable pour sécuriser le cron.
-
-**Dans Vercel → Settings → Environment Variables, ajoute :**
-```
-Key:   CRON_SECRET
-//Value: ton-secret-aleatoire-super-long-123456789
-```
-
-💡 **Génère un secret aléatoire** : Tu peux utiliser n'importe quelle chaîne longue et complexe, par exemple :
-```
-tontine-cron-secret-2024-abc123xyz789
