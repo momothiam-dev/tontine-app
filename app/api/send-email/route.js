@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server'
 import { sendEmail } from '@/lib/email'
 import { emailTemplates } from '@/lib/email-templates'
 
+// Désactiver la pré-génération statique pour cette route API
+export const dynamic = 'force-dynamic'
+
 export async function POST(request) {
   try {
     const { type, to, payload } = await request.json()

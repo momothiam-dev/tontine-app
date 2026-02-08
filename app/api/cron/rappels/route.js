@@ -6,13 +6,18 @@ import { emailTemplates } from '@/lib/email-templates'
 // Désactiver la pré-génération statique pour cette route API
 export const dynamic = 'force-dynamic'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
+function getSupabaseClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+  )
+}
 
 export async function GET(request) {
   try {
+    // Créer le client Supabase uniquement lors de l'exécution
+    const supabase = getSupabaseClient()
+    
     // Vérifier le token de sécurité
     const authHeader = request.headers.get('authorization')
     if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
