@@ -1,4 +1,5 @@
 // app/page.js
+'use client'
 import { FaArrowRight, FaShieldHalved, FaBell, FaUserGroup, FaCheck, FaMobileScreen, FaLock, FaChartBar } from 'react-icons/fa6'
 
 export default function Home() {
